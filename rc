@@ -1,0 +1,75 @@
+# #!/bin/sh
+#
+# PROVIDE: lambdabot
+# REQUIRE: NETWORKING
+# BEFORE:  LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=lambdabot
+rcvar=lambdabot_enable
+desc="Bot for the Lambda Utility mod"
+
+load_rc_config $name
+
+: ${lambdabot_enable:=NO}
+: ${lambdabot_command="/usr/local/bin/${name}"}
+: ${lambdabot_directory="/usr/local/etc/${name}"}
+: ${lambdabot_flags=""}
+: ${lambdabot_var="/var/db/${name}"}
+: ${lambdabot_logdir="/var/log/${name}"}
+: ${lambdabot_logfile="${lambdabot_logdir}/${name}.log"}
+: ${lambdabot_user:="root"}
+: ${lambdabot_group:="wheel"}
+
+command="${lambdabot_command}"
+pidfile="/var/run/${name}/${name}.pid"
+
+start_precmd="lambdabot_precmd"
+start_cmd="lambdabot_start"
+
+lambdabot_precmd()
+{
+    /usr/bin/install -d -m 700 -o "${lambdabot_user}" -g "${lambdabot_group}" ${lambdabot_directory}
+    /usr/bin/install -d -m 700 -o "${lambdabot_user}" -g "${lambdabot_group}" ${lambdabot_var}
+    /usr/bin/install -d -m 700 -o "${lambdabot_user}" -g "${lambdabot_group}" ${lambdabot_logdir}
+    /usr/bin/install -d -m 700 -o "${lambdabot_user}" -g "${lambdabot_group}" /var/run/${name}
+    if [ -e ${lambdabot_logfile} ]; then
+        /bin/chmod 644 ${lambdabot_logfile}
+        /usr/sbin/chown "${lambdabot_user}:${lambdabot_group}" ${lambdabot_logfile}
+    else
+        /usr/bin/install -m 700 -o "${lambdabot_user}" -g "${lambdabot_group}" /dev/null ${lambdabot_logfile}
+    fi
+}
+
+lambdabot_start() {
+  /usr/bin/su -m "${lambdabot_user}" -c "${lambdabot_command} ${lambdabot_flags} >> ${lambdabot_logfile} 2>&1 &"
+  sleep 1
+  pid=$(pgrep -f "${lambdabot_command}")
+  if [ -n "$pid" ]; then
+    echo $pid > ${pidfile}
+    echo "pid: $pid"
+    echo "Log: ${lambdabot_logfile}"
+  else
+    echo "Error: lambdabot failed to start"
+    echo "Check the log: ${lambdabot_logfile}"
+    return 1
+  fi
+}
+
+lambdabot_stop() {
+  if [ -f ${pidfile} ]; then
+    pid=$(cat ${pidfile})
+    if kill -TERM $pid; then
+      echo "lambdabot stopped successfully"
+      rm -f ${pidfile}
+    else
+      echo "unable to stop lambdabot"
+    fi
+  else
+    echo "pid file not found, is lambdabot running?"
+  fi
+}
+
+run_rc_command "$1"
