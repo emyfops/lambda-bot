@@ -16,7 +16,7 @@ import (
 
 var (
 	guildScope   = flag.String("guild", "", "Guild ID command scope")
-	allowedUsers = flag.StringArray("users", []string{}, "User IDs to be allowed")
+	allowedUsers = flag.StringSlice("users", []string{}, "User IDs to be allowed")
 	token        = flag.String("token", "", "Bot Token")
 	dbPath       = flag.String("dbPath", "/tmp/badger", "The directory in which the database is created")
 	db           *badger.DB
