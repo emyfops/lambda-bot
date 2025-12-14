@@ -30,7 +30,8 @@ func (c *Config) Run(ctx ken.Context) error {
 	return ctx.HandleSubCommands(
 		ken.SubCommandHandler{Name: "create", Run: c.createSnippet},
 		ken.SubCommandHandler{Name: "query", Run: c.querySnippet},
-		ken.SubCommandHandler{Name: "list", Run: c.listSnippets})
+		ken.SubCommandHandler{Name: "list", Run: c.listSnippets},
+		ken.SubCommandHandler{Name: "delete", Run: c.deleteSnippet})
 }
 
 func (c *Config) createSnippet(ctx ken.SubCommandContext) error {
@@ -122,6 +123,25 @@ func (c *Config) listSnippets(ctx ken.SubCommandContext) error {
 	})
 }
 
+func (c *Config) deleteSnippet(ctx ken.SubCommandContext) error {
+	if !slices.Contains(*allowedUsers, ctx.User().ID) {
+		return fmt.Errorf("you are not allowed to use this commannd")
+	}
+
+	name := strings.ToLower(ctx.Options().GetByName("name").StringValue())
+
+	return db.Update(func(txn *badger.Txn) error {
+		txn.Delete([]byte(name))
+
+		return ctx.Respond(&discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("Marked '%s' as deleted.", name),
+			},
+		})
+	})
+}
+
 func (c *Config) Options() []*discordgo.ApplicationCommandOption {
 	return []*discordgo.ApplicationCommandOption{
 		{
@@ -134,6 +154,7 @@ func (c *Config) Options() []*discordgo.ApplicationCommandOption {
 					Name:        "name",
 					Description: "The name of the snippet config",
 					Required:    true,
+					MaxLength:   32,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionAttachment,
@@ -162,6 +183,7 @@ func (c *Config) Options() []*discordgo.ApplicationCommandOption {
 					Name:        "name",
 					Description: "The name of the snippet",
 					Required:    true,
+					MaxLength:   32,
 				},
 			},
 		},
@@ -169,6 +191,20 @@ func (c *Config) Options() []*discordgo.ApplicationCommandOption {
 			Type:        discordgo.ApplicationCommandOptionSubCommand,
 			Name:        "list",
 			Description: "Return the list of available snippets",
+		},
+		{
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Name:        "delete",
+			Description: "Delete a given snippet",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "The name of the snippet",
+					Required:    true,
+					MaxLength:   32,
+				},
+			},
 		},
 	}
 }
